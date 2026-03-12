@@ -1,0 +1,42 @@
+import os
+import tkinter as tk
+from dotenv import load_dotenv
+
+load_dotenv()
+
+USUARIO_CORRECTO = os.getenv("APP_USER")
+CLAVE_CORRECTA = os.getenv("APP_PASSWORD")
+
+def capturar_credenciales():
+    usuario = entrada_usuario.get()
+    clave = entrada_clave.get()
+    validar_credenciales(usuario, clave)
+
+def validar_credenciales(usuario, clave):
+    if usuario == USUARIO_CORRECTO and clave == CLAVE_CORRECTA:
+        mostrar_mensaje("Acceso correcto", "green")
+    else:
+        mostrar_mensaje("Usuario o contraseña incorrectos", "red")
+
+def mostrar_mensaje(texto, color):
+    etiqueta_mensaje.config(text=texto, fg=color)
+
+ventana = tk.Tk()
+ventana.title("Inicio de sesión")
+ventana.geometry("300x200")
+
+tk.Label(ventana, text="Usuario").pack()
+entrada_usuario = tk.Entry(ventana)
+entrada_usuario.pack()
+
+tk.Label(ventana, text="Contraseña").pack()
+entrada_clave = tk.Entry(ventana, show="*")
+entrada_clave.pack()
+
+boton = tk.Button(ventana, text="Iniciar sesión", command=capturar_credenciales)
+boton.pack(pady=10)
+
+etiqueta_mensaje = tk.Label(ventana, text="")
+etiqueta_mensaje.pack()
+
+ventana.mainloop()
