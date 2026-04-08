@@ -1,0 +1,255 @@
+import uuid
+import tkinter as tk
+from tkinter import ttk, messagebox
+class Categoria:
+    def __init__(self, nombre):
+        self.id = str(uuid.uuid4())
+        self.nombre = nombre
+class Producto:
+    def __init__(self, nombre, categoria_id, stock):
+        self.id = str(uuid.uuid4())
+        self.nombre = nombre
+        self.categoria_id = categoria_id
+        self.stock = stock
+class CategoriaRepo:
+    def __init__(self):
+        self.categorias = []
+
+    def agregar(self, categoria):
+        self.categorias.append(categoria)
+
+    def obtener_todas(self):
+        return self.categorias
+
+    def eliminar(self, categoria_id):
+        self.categorias = [c for c in self.categorias if c.id != categoria_id]
+class ProductoRepo:
+    def __init__(self):
+        self.productos = []
+
+    def agregar(self, producto):
+        self.productos.append(producto)
+
+    def obtener_todos(self):
+        return self.productos
+
+    def eliminar(self, producto_id):
+        self.productos = [p for p in self.productos if p.id != producto_id]
+
+    def actualizar(self, producto_id, nombre, categoria_id, stock):
+        for p in self.productos:
+            if p.id == producto_id:
+                p.nombre = nombre
+                p.categoria_id = categoria_id
+                p.stock = stock
+
+    def buscar(self, texto):
+        return [p for p in self.productos if texto.lower() in p.nombre.lower()]
+
+    def por_categoria(self, categoria_id):
+        return [p for p in self.productos if p.categoria_id == categoria_id]
+
+class CategoriaService:
+    def __init__(self, repo):
+        self.repo = repo
+
+    def crear(self, nombre):
+        if not nombre:
+            raise ValueError("Nombre vacío")
+        self.repo.agregar(Categoria(nombre))
+
+    def obtener(self):
+        return self.repo.obtener_todas()
+
+    def eliminar(self, categoria_id):
+        self.repo.eliminar(categoria_id)
+
+class ProductoService:
+    def __init__(self, repo):
+        self.repo = repo
+
+    def crear(self, nombre, categoria_id, stock):
+        if not nombre:
+            raise ValueError("Nombre vacío")
+        if stock < 0:
+            raise ValueError("Stock inválido")
+
+        self.repo.agregar(Producto(nombre, categoria_id, stock))
+
+    def obtener(self):
+        return self.repo.obtener_todos()
+
+    def eliminar(self, producto_id):
+        self.repo.eliminar(producto_id)
+
+    def actualizar(self, producto_id, nombre, categoria_id, stock):
+        self.repo.actualizar(producto_id, nombre, categoria_id, stock)
+
+    def buscar(self, texto):
+        return self.repo.buscar(texto)
+
+    def por_categoria(self, categoria_id):
+        return self.repo.por_categoria(categoria_id)
+
+class App:
+    def __init__(self, root, cat_service, prod_service):
+        self.cat_service = cat_service
+        self.prod_service = prod_service
+
+        self.root = root
+        self.root.title("MiniMarket")
+
+        self.producto_id = None
+
+        self.crear_ui()
+        self.cargar_categorias()
+        self.cargar_productos()
+
+    def crear_ui(self):
+        frame_cat = ttk.LabelFrame(self.root, text="Categorías")
+        frame_cat.grid(row=0, column=0, padx=10, pady=10)
+
+        self.entry_cat = ttk.Entry(frame_cat)
+        self.entry_cat.grid(row=0, column=0)
+
+        ttk.Button(frame_cat, text="Agregar", command=self.agregar_categoria).grid(row=0, column=1)
+        ttk.Button(frame_cat, text="Eliminar", command=self.eliminar_categoria).grid(row=0, column=2)
+
+        self.lista_cat = tk.Listbox(frame_cat)
+        self.lista_cat.grid(row=1, column=0, columnspan=3)
+
+        frame_prod = ttk.LabelFrame(self.root, text="Productos")
+        frame_prod.grid(row=0, column=1, padx=10, pady=10)
+
+        self.entry_nombre = ttk.Entry(frame_prod)
+        self.entry_nombre.grid(row=0, column=0)
+
+        self.entry_stock = ttk.Entry(frame_prod)
+        self.entry_stock.grid(row=0, column=1)
+
+        self.combo_cat = ttk.Combobox(frame_prod, state="readonly")
+        self.combo_cat.grid(row=0, column=2)
+
+        ttk.Button(frame_prod, text="Agregar", command=self.agregar_producto).grid(row=0, column=3)
+        ttk.Button(frame_prod, text="Actualizar", command=self.actualizar_producto).grid(row=0, column=4)
+        ttk.Button(frame_prod, text="Eliminar", command=self.eliminar_producto).grid(row=0, column=5)
+
+        self.entry_buscar = ttk.Entry(frame_prod)
+        self.entry_buscar.grid(row=1, column=0)
+        self.entry_buscar.bind("<KeyRelease>", self.buscar)
+
+        self.tree = ttk.Treeview(frame_prod, columns=("ID", "Nombre", "Stock"), show="headings")
+        self.tree.heading("ID", text="ID")
+        self.tree.heading("Nombre", text="Nombre")
+        self.tree.heading("Stock", text="Stock")
+        self.tree.grid(row=2, column=0, columnspan=6)
+
+        self.tree.bind("<<TreeviewSelect>>", self.seleccionar)
+
+    def agregar_categoria(self):
+        try:
+            self.cat_service.crear(self.entry_cat.get())
+            self.cargar_categorias()
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+
+    def eliminar_categoria(self):
+        sel = self.lista_cat.curselection()
+        if not sel:
+            return
+
+        categorias = self.cat_service.obtener()
+        self.cat_service.eliminar(categorias[sel[0]].id)
+        self.cargar_categorias()
+
+    def cargar_categorias(self):
+        self.lista_cat.delete(0, tk.END)
+        cats = self.cat_service.obtener()
+
+        self.combo_cat["values"] = [c.nombre for c in cats]
+
+        for c in cats:
+            self.lista_cat.insert(tk.END, c.nombre)
+
+    def agregar_producto(self):
+        try:
+            nombre = self.entry_nombre.get()
+            stock = int(self.entry_stock.get())
+            cat_index = self.combo_cat.current()
+
+            if cat_index == -1:
+                raise ValueError("Seleccione una categoría")
+
+            categoria_id = self.cat_service.obtener()[cat_index].id
+
+            self.prod_service.crear(nombre, categoria_id, stock)
+            self.cargar_productos()
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+
+    def cargar_productos(self):
+        for row in self.tree.get_children():
+            self.tree.delete(row)
+
+        for p in self.prod_service.obtener():
+            self.tree.insert("", tk.END, values=(p.id, p.nombre, p.stock))
+
+    def seleccionar(self, event):
+        item = self.tree.selection()
+        if not item:
+            return
+
+        valores = self.tree.item(item)["values"]
+        self.producto_id = valores[0]
+
+        self.entry_nombre.delete(0, tk.END)
+        self.entry_nombre.insert(0, valores[1])
+
+        self.entry_stock.delete(0, tk.END)
+        self.entry_stock.insert(0, valores[2])
+
+    def actualizar_producto(self):
+        if not self.producto_id:
+            return
+
+        nombre = self.entry_nombre.get()
+        stock = int(self.entry_stock.get())
+        cat_index = self.combo_cat.current()
+
+        categoria_id = self.cat_service.obtener()[cat_index].id
+
+        self.prod_service.actualizar(self.producto_id, nombre, categoria_id, stock)
+        self.cargar_productos()
+
+    def eliminar_producto(self):
+        if not self.producto_id:
+            return
+
+        self.prod_service.eliminar(self.producto_id)
+        self.cargar_productos()
+
+    def buscar(self, event):
+        texto = self.entry_buscar.get()
+        resultados = self.prod_service.buscar(texto)
+
+        for row in self.tree.get_children():
+            self.tree.delete(row)
+
+        for p in resultados:
+            self.tree.insert("", tk.END, values=(p.id, p.nombre, p.stock))
+
+def main():
+    repo_cat = CategoriaRepo()
+    repo_prod = ProductoRepo()
+
+    servicio_cat = CategoriaService(repo_cat)
+    servicio_prod = ProductoService(repo_prod)
+
+    root = tk.Tk()
+    app = App(root, servicio_cat, servicio_prod)
+
+    root.mainloop()
+
+
+if __name__ == "__main__":
+    main()
